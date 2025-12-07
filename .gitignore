@@ -1,0 +1,43 @@
+# Ignore environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Testing
+.pytest_cache/
+test-results/
+htmlcov/
+.coverage
+*.xml
+*.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+order_manager/static/uploads/*
+!order_manager/static/uploads/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Docker
+*.tar
