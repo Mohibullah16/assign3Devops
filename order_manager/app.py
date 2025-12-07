@@ -209,12 +209,20 @@ async def add_order(
         # Build items list from form arrays
         items = []
         for i in range(len(descriptions)):
-            qty_val = int(qtys[i])
-            price_val = float(prices[i])
+            # Skip empty descriptions
+            if not descriptions[i].strip():
+                continue
+                
+            qty_val = int(qtys[i]) if qtys[i] else 1
+            price_val = float(prices[i]) if prices[i] else 0.0
             amount = qty_val * price_val
+            
+            # Use provided sr_no or auto-generate
+            sr_no = int(sr_nos[i]) if (sr_nos and i < len(sr_nos) and sr_nos[i]) else (i + 1)
+            
             items.append({
-                "sr_no": int(sr_nos[i]),
-                "sku": skus[i],
+                "sr_no": sr_no,
+                "sku": skus[i] if (skus and i < len(skus)) else "",
                 "description": descriptions[i],
                 "qty": qty_val,
                 "price": price_val,

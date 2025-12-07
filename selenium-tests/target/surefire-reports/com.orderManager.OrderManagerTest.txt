@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.orderManager.OrderManagerTest
+-------------------------------------------------------------------------------
+Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 92.24 s -- in com.orderManager.OrderManagerTest
