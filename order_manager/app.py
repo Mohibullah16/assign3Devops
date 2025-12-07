@@ -1,5 +1,6 @@
 import os
 import base64
+import certifi
 from datetime import datetime
 from typing import Optional, List
 from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
@@ -19,10 +20,9 @@ load_dotenv()
 app = FastAPI(title="Order Manager")
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="order_manager/static"), name="static")
-
+app.mount("/static", StaticFiles(directory="static"), name="static")
 # Templates
-templates = Jinja2Templates(directory="order_manager/templates")
+templates = Jinja2Templates(directory="templates")
 
 # --- Database Setup (Motor - Async MongoDB) ---
 MONGO_URI = os.getenv("MONGO_URI")
@@ -31,7 +31,13 @@ TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 if TEST_MODE:
     MONGO_URI = os.getenv("TEST_MONGO_URI", MONGO_URI)
 
-client = AsyncIOMotorClient(MONGO_URI)
+# Configure MongoDB client with SSL settings for Python 3.12+
+import certifi
+client = AsyncIOMotorClient(
+    MONGO_URI,
+    tlsCAFile=certifi.where(),
+    serverSelectionTimeoutMS=10000
+)
 db = client.order_management_db if not TEST_MODE else client.order_management_test_db
 orders_collection = db.orders
 
@@ -91,36 +97,132 @@ async def get_kpis():
 # --- Routes ---
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+async def index(request: Request, search: str = None):
     """Homepage with orders list and KPIs"""
     orders = []
-    async for order in orders_collection.find().sort("created_at", DESCENDING).limit(50):
-        order['_id'] = str(order['_id'])
-        orders.append(order)
+    
+    # Build search query
+    query = {}
+    if search:
+        query = {
+            "$or": [
+                {"invoice_number": {"$regex": search, "$options": "i"}},
+                {"customer_name": {"$regex": search, "$options": "i"}},
+                {"salesman_name": {"$regex": search, "$options": "i"}},
+                {"items.description": {"$regex": search, "$options": "i"}},
+                {"items.sku": {"$regex": search, "$options": "i"}}
+            ]
+        }
+    
+    async for order in orders_collection.find(query).sort("created_at", DESCENDING).limit(50):
+        order_dict = dict(order)
+        order_dict['_id'] = str(order_dict['_id'])
+        orders.append(order_dict)
     
     kpis = await get_kpis()
     return templates.TemplateResponse("index.html", {
         "request": request,
         "orders": orders,
-        "kpis": kpis
+        "kpis": kpis,
+        "search_query": search,
+        "show_form": False
     })
 
-@app.post("/add_order")
+@app.get("/items", response_class=HTMLResponse)
+async def items_page(request: Request, search: str = None):
+    """Items database page showing all unique items"""
+    # Aggregation pipeline to get unique items with stats
+    pipeline = [
+        {"$unwind": "$items"},
+        {
+            "$group": {
+                "_id": {"sku": "$items.sku", "description": "$items.description"},
+                "total_qty": {"$sum": "$items.qty"},
+                "avg_price": {"$avg": "$items.price"},
+                "total_amount": {"$sum": "$items.amount"},
+                "order_count": {"$sum": 1}
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "sku": "$_id.sku",
+                "description": "$_id.description",
+                "total_qty": 1,
+                "avg_price": 1,
+                "total_amount": 1,
+                "order_count": 1
+            }
+        },
+        {"$sort": {"total_amount": -1}}
+    ]
+    
+    # Add search filter if provided
+    if search:
+        pipeline.insert(1, {
+            "$match": {
+                "$or": [
+                    {"items.sku": {"$regex": search, "$options": "i"}},
+                    {"items.description": {"$regex": search, "$options": "i"}}
+                ]
+            }
+        })
+    
+    items = []
+    async for item in orders_collection.aggregate(pipeline):
+        items.append(item)
+    
+    # Calculate overall stats
+    stats = {
+        "unique_items": len(items),
+        "total_quantity": sum(item['total_qty'] for item in items),
+        "total_value": sum(item['total_amount'] for item in items)
+    }
+    
+    return templates.TemplateResponse("items.html", {
+        "request": request,
+        "items": items,
+        "stats": stats,
+        "search_query": search
+    })
+
+@app.post("/orders/add")
 async def add_order(
     request: Request,
     invoice_number: Optional[str] = Form(None),
-    customer: Optional[str] = Form(None),
-    salesman: Optional[str] = Form(None),
-    items_json: str = Form(...),
+    customer_name: Optional[str] = Form(None),
+    salesman_name: Optional[str] = Form(None),
     invoice_image: Optional[UploadFile] = File(None)
 ):
     """Add new order with multiple items"""
     try:
-        import json
-        items = json.loads(items_json)
+        # Parse form data
+        form_data = await request.form()
+        
+        # Extract array fields
+        sr_nos = form_data.getlist('sr_no[]')
+        skus = form_data.getlist('sku[]')
+        descriptions = form_data.getlist('description[]')
+        qtys = form_data.getlist('qty[]')
+        prices = form_data.getlist('price[]')
+        
+        # Build items list from form arrays
+        items = []
+        for i in range(len(descriptions)):
+            qty_val = int(qtys[i])
+            price_val = float(prices[i])
+            amount = qty_val * price_val
+            items.append({
+                "sr_no": int(sr_nos[i]),
+                "sku": skus[i],
+                "description": descriptions[i],
+                "qty": qty_val,
+                "price": price_val,
+                "amount": amount
+            })
         
         # Validate items
-        if not items or len(items) == 0:
+        if not items:
             raise HTTPException(status_code=400, detail="At least one item is required")
         
         # Calculate totals
@@ -141,10 +243,10 @@ async def add_order(
         # Create order document
         order_data = {
             "invoice_number": invoice_number or f"INV-{int(datetime.now().timestamp())}",
-            "customer": customer or "Walk-in Customer",
-            "salesman": salesman or "N/A",
+            "customer_name": customer_name or "Walk-in Customer",
+            "salesman_name": salesman_name or "N/A",
             "items": items,
-            "total_qty": total_qty,
+            "total_quantity": total_qty,
             "total_amount": total_amount,
             "invoice_image": filename,
             "created_at": datetime.now()
@@ -156,7 +258,7 @@ async def add_order(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error adding order: {str(e)}")
 
-@app.get("/delete/{order_id}")
+@app.post("/orders/{order_id}/delete")
 async def delete_order(order_id: str):
     """Delete an order"""
     try:
@@ -167,7 +269,7 @@ async def delete_order(order_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting order: {str(e)}")
 
-@app.get("/edit/{order_id}", response_class=HTMLResponse)
+@app.get("/orders/{order_id}/edit", response_class=HTMLResponse)
 async def edit_order(request: Request, order_id: str):
     """Show edit form for an order"""
     try:
@@ -175,26 +277,49 @@ async def edit_order(request: Request, order_id: str):
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
         
-        order['_id'] = str(order['_id'])
+        order_dict = dict(order)
+        order_dict['_id'] = str(order_dict['_id'])
         return templates.TemplateResponse("edit.html", {
             "request": request,
-            "order": order
+            "order": order_dict
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading order: {str(e)}")
 
-@app.post("/update/{order_id}")
+@app.post("/orders/{order_id}/update")
 async def update_order(
+    request: Request,
     order_id: str,
     invoice_number: Optional[str] = Form(None),
-    customer: Optional[str] = Form(None),
-    salesman: Optional[str] = Form(None),
-    items_json: str = Form(...)
+    customer_name: Optional[str] = Form(None),
+    salesman_name: Optional[str] = Form(None)
 ):
     """Update an existing order"""
     try:
-        import json
-        items = json.loads(items_json)
+        # Parse form data
+        form_data = await request.form()
+        
+        # Extract array fields
+        sr_nos = form_data.getlist('sr_no[]')
+        skus = form_data.getlist('sku[]')
+        descriptions = form_data.getlist('description[]')
+        qtys = form_data.getlist('qty[]')
+        prices = form_data.getlist('price[]')
+        
+        # Build items list from form arrays
+        items = []
+        for i in range(len(descriptions)):
+            qty_val = int(qtys[i])
+            price_val = float(prices[i])
+            amount = qty_val * price_val
+            items.append({
+                "sr_no": int(sr_nos[i]),
+                "sku": skus[i],
+                "description": descriptions[i],
+                "qty": qty_val,
+                "price": price_val,
+                "amount": amount
+            })
         
         # Calculate totals
         total_qty = sum(item['qty'] for item in items)
@@ -202,10 +327,10 @@ async def update_order(
         
         update_data = {
             "invoice_number": invoice_number,
-            "customer": customer,
-            "salesman": salesman,
+            "customer_name": customer_name,
+            "salesman_name": salesman_name,
             "items": items,
-            "total_qty": total_qty,
+            "total_quantity": total_qty,
             "total_amount": total_amount
         }
         
@@ -304,7 +429,7 @@ Preserve exact SKU codes and descriptions. If a field is not visible, use null."
                     ]
                 }
             ],
-            model="llama-3.2-11b-vision-preview",
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
             response_format={"type": "json_object"},
             temperature=0.1
         )

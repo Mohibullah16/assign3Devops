@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Order - Order Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        .line-item {
+            background: var(--pico-background-color);
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            border-radius: 12px;
+            position: relative;
+            border: 2px solid var(--pico-muted-border-color);
+            transition: all 0.2s ease;
+        }
+        .line-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+        }
+        @media (max-width: 600px) {
+            .line-item > div {
+                grid-template-columns: 1fr !important;
+            }
+            .line-item label {
+                grid-column: 1 / -1 !important;
+            }
+        }
+        .remove-item-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+        }
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <h1>✏️ Edit Order</h1>
+            <p>Invoice #{{ order['invoice_number'] }}</p>
+        </header>
+
+        <form method="POST" action="/orders/{{ order['_id'] }}/update">
+            <label>
+                Invoice Number
+                <input type="text" name="invoice_number" value="{{ order['invoice_number'] }}" required>
+            </label>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <label>
+                    Customer Name <small>(optional)</small>
+                    <input type="text" name="customer_name" value="{{ order['customer_name'] }}" placeholder="Optional">
+                </label>
+                <label>
+                    Salesman Name <small>(optional)</small>
+                    <input type="text" name="salesman_name" value="{{ order['salesman_name'] }}" placeholder="Optional">
+                </label>
+            </div>
+
+            <h3>Line Items</h3>
+            <div id="lineItemsContainer">
+                {% for item in order['items'] %}
+                <div class="line-item" id="item-{{ loop.index }}">
+                    <button type="button" class="remove-item-btn secondary" onclick="removeLineItem({{ loop.index }})">✕</button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <label style="grid-column: 1 / 2;">
+                            Sr#
+                            <input type="number" name="sr_no[]" value="{{ item['sr_no'] }}" required>
+                        </label>
+                        <label style="grid-column: 2 / 3;">
+                            SKU
+                            <input type="text" name="sku[]" value="{{ item['sku'] }}" required>
+                        </label>
+                        <label style="grid-column: 1 / -1;">
+                            Description
+                            <input type="text" name="description[]" value="{{ item['description'] }}" required>
+                        </label>
+                        <label style="grid-column: 1 / 2;">
+                            Qty
+                            <input type="number" name="qty[]" value="{{ item['qty'] }}" min="1" required>
+                        </label>
+                        <label style="grid-column: 2 / 3;">
+                            Price (PKR)
+                            <input type="number" name="price[]" step="0.01" value="{{ item['price'] }}" required>
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="btn-group">
+                <button type="button" onclick="addLineItem()" class="secondary">+ Add Item</button>
+                <button type="submit">Update Order</button>
+                <a href="/" role="button" class="contrast">Cancel</a>
+            </div>
+        </form>
+    </main>
+
+    <script>
+        let itemCounter = {{ order['items']|length }};
+
+        function addLineItem() {
+            itemCounter++;
+            const container = document.getElementById('lineItemsContainer');
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'line-item';
+            itemDiv.id = `item-${itemCounter}`;
+            
+            itemDiv.innerHTML = `
+                <button type="button" class="remove-item-btn secondary" onclick="removeLineItem(${itemCounter})">✕</button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <label style="grid-column: 1 / 2;">
+                        Sr#
+                        <input type="number" name="sr_no[]" value="${itemCounter}" required>
+                    </label>
+                    <label style="grid-column: 2 / 3;">
+                        SKU
+                        <input type="text" name="sku[]" required>
+                    </label>
+                    <label style="grid-column: 1 / -1;">
+                        Description
+                        <input type="text" name="description[]" required>
+                    </label>
+                    <label style="grid-column: 1 / 2;">
+                        Qty
+                        <input type="number" name="qty[]" value="1" min="1" required>
+                    </label>
+                    <label style="grid-column: 2 / 3;">
+                        Price (PKR)
+                        <input type="number" name="price[]" step="0.01" required>
+                    </label>
+                </div>
+            `;
+            
+            container.appendChild(itemDiv);
+        }
+
+        function removeLineItem(id) {
+            const item = document.getElementById(`item-${id}`);
+            if (item && document.getElementById('lineItemsContainer').children.length > 1) {
+                item.remove();
+            } else {
+                alert('Cannot remove the last item. An order must have at least one item.');
+            }
+        }
+    </script>
+</body>
+</html>

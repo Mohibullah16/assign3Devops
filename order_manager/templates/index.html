@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body {
+            font-size: 0.9rem;
+        }
+        h2 {
+            font-size: 1.4rem;
+        }
+        h4, h5 {
+            font-size: 1rem;
+        }
+        @media (max-width: 768px) {
+            body {
+                font-size: 0.85rem;
+            }
+            .order-header {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 0.5rem;
+            }
+            .actions {
+                width: 100%;
+            }
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        @media (max-width: 768px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .kpi-card {
+            background: #4a5568;
+            color: white;
+            padding: 0.75rem;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+            transition: box-shadow 0.2s ease;
+        }
+        .kpi-card:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+        .kpi-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: white;
+            margin: 0.25rem 0;
+        }
+        .kpi-label {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            font-weight: 400;
+        }
+        .order-item {
+            background: var(--pico-card-background-color);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            border-radius: 6px;
+            border-left: 3px solid #4a5568;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.2s ease;
+        }
+        .order-item:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        }
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .order-meta {
+            color: var(--pico-muted-color);
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+        .items-list {
+            margin-top: 0.5rem;
+            padding-left: 1rem;
+        }
+        .item-detail {
+            padding: 0.25rem 0;
+            font-size: 0.85rem;
+        }
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        #addOrderForm {
+            background: var(--pico-card-background-color);
+            padding: 1.5rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        .line-item {
+            background: var(--pico-background-color);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            position: relative;
+            border: 1px solid var(--pico-muted-border-color);
+        }
+        @media (max-width: 600px) {
+            .line-item > div {
+                grid-template-columns: 1fr !important;
+            }
+            .line-item label {
+                grid-column: 1 / -1 !important;
+            }
+        }
+        .remove-item-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+        }
+        #ocrUploadSection {
+            text-align: center;
+            padding: 1.5rem;
+            border: 2px dashed #4a5568;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            background: rgba(74, 85, 104, 0.05);
+        }
+        #ocrStatus {
+            margin-top: 1rem;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="font-size: 1.75rem; margin-bottom: 0.5rem; color: #333;">📦 Order Manager</h1>
+            <p style="color: #666; font-size: 0.9rem;">Manage orders with OCR-powered invoice scanning</p>
+            <div style="margin-top: 1rem;">
+                <a href="/items" role="button" class="secondary" style="font-size: 0.85rem;">📋 View Items Database</a>
+            </div>
+        </header>
+
+        <!-- KPI Dashboard -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Spend</div>
+                <div class="kpi-value">PKR {{ "{:,.2f}".format(kpis.spend) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total Orders</div>
+                <div class="kpi-value">{{ kpis.count }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Average Order Value</div>
+                <div class="kpi-value">PKR {{ "{:,.2f}".format(kpis.avg) }}</div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div style="margin-bottom: 1.5rem;">
+            <input type="search" id="searchInput" placeholder="🔍 Search orders by invoice, customer, salesman, item description, or SKU..." 
+                   value="{{ search_query or '' }}" 
+                   style="width: 100%; font-size: 0.9rem; padding: 0.5rem 0.75rem;">
+        </div>
+
+        <!-- Add Order Form -->
+        <details {% if show_form %}open{% endif %}>
+            <summary><strong>➕ Add New Order</strong></summary>
+            
+            <div id="addOrderForm">
+                <!-- OCR Upload Section -->
+                <div id="ocrUploadSection">
+                    <h4>📸 Upload Invoice for OCR</h4>
+                    <div>
+                        <input type="file" id="invoiceImage" name="invoice" accept="image/*" required>
+                        <button type="button" id="ocrSubmitBtn" onclick="submitOCR()">Scan Invoice</button>
+                    </div>
+                    <div id="ocrStatus"></div>
+                </div>
+
+                <p style="text-align: center; color: var(--pico-muted-color);">— OR —</p>
+
+                <!-- Manual Entry Form -->
+                <form id="addOrderFormElement" method="POST" action="/orders/add">
+                    <label>
+                        Invoice Number
+                        <input type="text" name="invoice_number" id="invoice_number" required>
+                    </label>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <label>
+                            Customer Name <small>(optional)</small>
+                            <input type="text" name="customer_name" id="customer_name" placeholder="Optional">
+                        </label>
+                        <label>
+                            Salesman Name <small>(optional)</small>
+                            <input type="text" name="salesman_name" id="salesman_name" placeholder="Optional">
+                        </label>
+                    </div>
+
+                    <h5>Line Items</h5>
+                    <div id="lineItemsContainer">
+                        <!-- Line items will be added here -->
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="button" onclick="addLineItem()" class="secondary">+ Add Item</button>
+                        <button type="submit">Save Order</button>
+                    </div>
+                </form>
+            </div>
+        </details>
+
+        <hr>
+
+        <!-- Orders List -->
+        <h2>Orders ({{ orders|length }})</h2>
+        {% if orders %}
+            {% for order in orders %}
+            <div class="order-item">
+                <div class="order-header">
+                    <div>
+                        <strong>Invoice #{{ order['invoice_number'] }}</strong>
+                        <div class="order-meta">
+                            👤 {{ order['customer_name'] }} | 🤝 {{ order['salesman_name'] }}
+                            <br>📅 {{ order['created_at'].strftime('%Y-%m-%d %H:%M') if order.get('created_at') else 'N/A' }}
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <a href="/orders/{{ order['_id'] }}/edit" role="button" class="secondary">Edit</a>
+                        <button onclick="deleteOrder('{{ order['_id'] }}')" class="contrast">Delete</button>
+                    </div>
+                </div>
+                
+                <details>
+                    <summary><strong>Items ({{ order['total_quantity'] }})</strong> - Total: <strong>PKR {{ "{:,.2f}".format(order['total_amount']) }}</strong></summary>
+                    <div class="items-list">
+                        {% for item in order['items'] %}
+                        <div class="item-detail">
+                            {{ item['sr_no'] }}. <strong>{{ item['description'] }}</strong> (SKU: {{ item['sku'] }})
+                            - Qty: {{ item['qty'] }} × PKR {{ "{:,.2f}".format(item['price']) }} = PKR {{ "{:,.2f}".format(item['amount']) }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        {% else %}
+            <article>
+                <p>No orders found. {% if search_query %}Try a different search.{% else %}Add your first order above!{% endif %}</p>
+            </article>
+        {% endif %}
+    </main>
+
+    <script>
+        let itemCounter = 0;
+
+        function addLineItem(data = {}) {
+            itemCounter++;
+            const container = document.getElementById('lineItemsContainer');
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'line-item';
+            itemDiv.id = `item-${itemCounter}`;
+            
+            itemDiv.innerHTML = `
+                <button type="button" class="remove-item-btn secondary" onclick="removeLineItem(${itemCounter})">✕</button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <label style="grid-column: 1 / 2;">
+                        Sr#
+                        <input type="number" name="sr_no[]" value="${data.sr_no || itemCounter}" required>
+                    </label>
+                    <label style="grid-column: 2 / 3;">
+                        SKU
+                        <input type="text" name="sku[]" value="${data.sku || ''}" required>
+                    </label>
+                    <label style="grid-column: 1 / -1;">
+                        Description
+                        <input type="text" name="description[]" value="${data.description || ''}" required>
+                    </label>
+                    <label style="grid-column: 1 / 2;">
+                        Qty
+                        <input type="number" name="qty[]" value="${data.qty || 1}" min="1" required>
+                    </label>
+                    <label style="grid-column: 2 / 3;">
+                        Price (PKR)
+                        <input type="number" name="price[]" step="0.01" value="${data.price || ''}" required>
+                    </label>
+                </div>
+            `;
+            
+            container.appendChild(itemDiv);
+        }
+
+        function removeLineItem(id) {
+            document.getElementById(`item-${id}`).remove();
+        }
+
+        function deleteOrder(orderId) {
+            if (confirm('Are you sure you want to delete this order?')) {
+                fetch(`/orders/${orderId}/delete`, {
+                    method: 'POST'
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Failed to delete order');
+                    }
+                });
+            }
+        }
+
+        // OCR Upload Handler
+        async function submitOCR() {
+            const fileInput = document.getElementById('invoiceImage');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select an image file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            const statusDiv = document.getElementById('ocrStatus');
+            const submitBtn = document.getElementById('ocrSubmitBtn');
+            
+            statusDiv.innerHTML = '⏳ Processing invoice...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/process_ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = '✅ Invoice scanned successfully! Filling form...';
+                    
+                    // Parse the nested JSON data
+                    const data = typeof result.data === 'string' ? JSON.parse(result.data) : result.data;
+                    
+                    // Fill form fields from header
+                    if (data.header) {
+                        document.getElementById('invoice_number').value = data.header.invoice_number || '';
+                        document.getElementById('customer_name').value = data.header.customer || '';
+                        document.getElementById('salesman_name').value = data.header.salesman || '';
+                    }
+                    
+                    // Clear and add items
+                    document.getElementById('lineItemsContainer').innerHTML = '';
+                    itemCounter = 0;
+                    
+                    if (data.items && data.items.length > 0) {
+                        data.items.forEach(item => addLineItem(item));
+                    } else {
+                        addLineItem();
+                    }
+                    
+                    setTimeout(() => {
+                        statusDiv.innerHTML = '';
+                        fileInput.value = '';
+                    }, 3000);
+                } else {
+                    statusDiv.innerHTML = `❌ Error: ${result.error || 'Failed to process invoice'}`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Add one item by default when page loads
+        if (document.getElementById('lineItemsContainer').children.length === 0) {
+            addLineItem();
+        }
+
+        // Form submission validation
+        document.getElementById('addOrderFormElement')?.addEventListener('submit', function(e) {
+            const container = document.getElementById('lineItemsContainer');
+            if (container.children.length === 0) {
+                e.preventDefault();
+                alert('Please add at least one line item');
+                return false;
+            }
+        });
+
+        // Real-time search functionality
+        const searchInput = document.getElementById('searchInput');
+        const orderItems = document.querySelectorAll('.order-item');
+        
+        searchInput?.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                // Show all orders when search is empty
+                orderItems.forEach(item => {
+                    item.style.display = 'block';
+                });
+                return;
+            }
+            
+            // Filter orders based on search term
+            orderItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

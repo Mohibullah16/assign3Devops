@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Items Database - Order Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body {
+            font-size: 0.9rem;
+        }
+        h2 {
+            font-size: 1.4rem;
+        }
+        .item-card {
+            background: var(--pico-card-background-color);
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 6px;
+            border-left: 3px solid #4a5568;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .item-meta {
+            color: var(--pico-muted-color);
+            font-size: 0.8rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: #4a5568;
+            color: white;
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            opacity: 0.9;
+        }
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        @media (max-width: 768px) {
+            .item-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .actions {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="font-size: 1.75rem; margin-bottom: 0.5rem; color: #333;">📦 Items Database</h1>
+            <p style="color: #666; font-size: 0.9rem;">Manage all items across orders</p>
+            <div style="margin-top: 1rem;">
+                <a href="/" role="button" class="secondary">← Back to Orders</a>
+            </div>
+        </header>
+
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.unique_items }}</div>
+                <div class="stat-label">UNIQUE ITEMS</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.total_quantity }}</div>
+                <div class="stat-label">TOTAL QUANTITY</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">PKR {{ "{:,.2f}".format(stats.total_value) }}</div>
+                <div class="stat-label">TOTAL VALUE</div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <form method="GET" action="/items">
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                <input type="search" name="search" placeholder="🔍 Search items by name, SKU, or description..." 
+                       value="{{ search_query or '' }}" 
+                       style="flex: 1; font-size: 1rem; padding: 0.75rem 1rem;">
+                <button type="submit" style="background: #4a5568; border: none; padding: 0.75rem 1.5rem;">Search</button>
+                {% if search_query %}
+                <a href="/items" role="button" class="secondary" style="padding: 0.75rem 1.5rem;">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+
+        <!-- Items List -->
+        <h2>All Items ({{ items|length }})</h2>
+        {% if items %}
+            {% for item in items %}
+            <div class="item-card">
+                <div class="item-header">
+                    <div>
+                        <strong>{{ item.description }}</strong>
+                        <div class="item-meta">
+                            SKU: {{ item.sku }} | Total Qty: {{ item.total_qty }} | Avg Price: PKR {{ "{:,.2f}".format(item.avg_price) }}
+                            <br>Used in {{ item.order_count }} order(s)
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <span style="background: #4a5568; color: white; padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.85rem;">
+                            Total: PKR {{ "{:,.2f}".format(item.total_amount) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <article>
+                <p>No items found. {% if search_query %}Try a different search.{% else %}Add orders to see items here.{% endif %}</p>
+            </article>
+        {% endif %}
+    </main>
+</body>
+</html>
