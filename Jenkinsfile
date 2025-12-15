@@ -104,10 +104,38 @@ pipeline {
         
         success {
             echo 'Pipeline successfully executed!'
+            emailext (
+                subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>Build Status: SUCCESS</p>
+                         <p>The build finished successfully.</p>
+                         <p>Check the Test Report: <a href='${env.BUILD_URL}testReport'>${env.BUILD_URL}testReport</a></p>
+                         <p>Console Output: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>""",
+                recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']]
+            )
         }
         
         failure {
             echo 'Pipeline failed!'
+            emailext (
+                subject: "FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>Build Status: FAILURE</p>
+                         <p>The build failed. Please check the logs.</p>
+                         <p>Check the Test Report: <a href='${env.BUILD_URL}testReport'>${env.BUILD_URL}testReport</a></p>
+                         <p>Console Output: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>""",
+                recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']]
+            )
+        }
+        
+        unstable {
+            echo 'Pipeline is unstable!'
+            emailext (
+                subject: "UNSTABLE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>Build Status: UNSTABLE</p>
+                         <p>Some tests may have failed.</p>
+                         <p>Check the Test Report: <a href='${env.BUILD_URL}testReport'>${env.BUILD_URL}testReport</a></p>
+                         <p>Console Output: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>""",
+                recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']]
+            )
         }
     }
 }

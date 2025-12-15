@@ -43,3 +43,23 @@ Your pipeline requires secrets to run the application.
 ## 5. Troubleshooting
 - **Permission Denied**: If Docker fails, restart Jenkins after adding it to the docker group (`sudo systemctl restart jenkins`).
 - **App Startup Failed**: Check the "Start Application" stage logs.
+
+## 6. Configure Email Notifications (SMTP)
+To allow Jenkins to send emails to the collaborator who pushed the code, you must configure the SMTP server.
+
+1. Go to **Manage Jenkins** > **System**.
+2. Scroll down to **Extended E-mail Notification**.
+   - **SMTP Server**: `smtp.gmail.com` (for Gmail)
+   - **Default User E-mail Suffix**: `@gmail.com`
+   - **Use SMTP Authentication**: Checked.
+     - **User Name**: Your Gmail address.
+     - **Password**: Your **App Password** (Not your login password. Generate one in Google Account > Security > 2-Step Verification > App passwords).
+   - **Use SSL**: Checked.
+   - **SMTP Port**: `465`.
+3. Scroll down to **E-mail Notification** (standard plugin) and configure it similarly as a fallback.
+4. Click **Save**.
+
+**Note regarding "Collaborator"**:
+- Jenkins identifies the "collaborator" based on the Git commit email.
+- Ensure your local git config (`git config user.email`) matches the email you want to receive notifications on.
+- The pipeline uses `RequesterRecipientProvider` and `DevelopersRecipientProvider` to find the user who triggered the build or committed the code.
