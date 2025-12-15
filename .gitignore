@@ -18,6 +18,7 @@ test-results/
 htmlcov/
 .coverage
 *.xml
+!pom.xml
 *.html
 
 # IDE
