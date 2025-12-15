@@ -49,6 +49,9 @@ public class OrderManagerTest {
         options.addArguments("--disable-gpu");
         options.addArguments("--window-size=1920,1080");
         options.addArguments("--disable-blink-features=AutomationControlled");
+        options.addArguments("--remote-allow-origins=*");
+        // Use a unique user-data-dir for each test run to avoid conflicts
+        options.addArguments("--user-data-dir=/tmp/chrome-data-" + System.currentTimeMillis());
         
         driver = new ChromeDriver(options);
         wait = new WebDriverWait(driver, Duration.ofSeconds(10));

@@ -76,11 +76,7 @@ pipeline {
         
         stage('Publish Results') {
             steps {
-                echo 'Publishing test results...'
-                
-                // Publish TestNG/JUnit results
-                junit allowEmptyResults: true, testResults: 'selenium-tests/target/surefire-reports/*.xml'
-                
+                echo 'Archiving artifacts...'
                 // Archive artifacts
                 archiveArtifacts allowEmptyArchive: true, artifacts: 'selenium-tests/target/surefire-reports/**/*'
             }
@@ -89,7 +85,11 @@ pipeline {
     
     post {
         always {
-            echo 'Cleaning up...'
+            echo 'Publishing results and cleaning up...'
+            
+            // Publish TestNG/JUnit results ALWAYS
+            junit allowEmptyResults: true, testResults: 'selenium-tests/target/surefire-reports/*.xml'
+            
             // Stop the application
             sh '''
                 if [ -f order_manager/app.pid ]; then
