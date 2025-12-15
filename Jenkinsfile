@@ -39,11 +39,9 @@ pipeline {
             steps {
                 echo 'Starting application in background...'
                 // Start Uvicorn in background using nohup
-                // We export the secrets as env vars for this shell session
+                // Env vars are automatically available from the environment block
                 sh '''
                     cd order_manager
-                    export MONGO_URI="${MONGO_URI}"
-                    export GROQ_API_KEY="${GROQ_API_KEY}"
                     
                     nohup uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
                     echo $! > app.pid
