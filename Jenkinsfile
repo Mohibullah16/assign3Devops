@@ -26,11 +26,12 @@ pipeline {
         stage('Setup Application') {
             steps {
                 echo 'Setting up Order Manager Application...'
-                // Install Python dependencies
-                // Warning: This assumes pip is available on the agent
+                // Create virtual environment and install dependencies
+                // This avoids 'externally-managed-environment' errors
                 sh '''
                     cd order_manager
-                    pip install -r requirements.txt
+                    python3 -m venv venv
+                    venv/bin/pip install -r requirements.txt
                 '''
             }
         }
@@ -43,7 +44,8 @@ pipeline {
                 sh '''
                     cd order_manager
                     
-                    nohup uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
+                    # Use uvicorn from the virtual environment
+                    nohup venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
                     echo $! > app.pid
                     sleep 10  # Wait for app to startup
                     
