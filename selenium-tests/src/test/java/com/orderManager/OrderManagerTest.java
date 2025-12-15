@@ -39,21 +39,16 @@ public class OrderManagerTest {
     
     @BeforeMethod
     public void setup() {
-        // Setup WebDriver
-        WebDriverManager.chromedriver().setup();
+        // WebDriverManager.chromedriver().setup(); // Disabled: Using container-provided ChromeDriver
         
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless=new"); // Use newer headless mode
+        options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-gpu");
         options.addArguments("--window-size=1920,1080");
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("--remote-allow-origins=*");
-        
-        // Use a unique user-data-dir in the build directory to ensure write permissions and no conflicts
-        String userDataDir = System.getProperty("user.dir") + "/target/chrome-data/" + java.util.UUID.randomUUID().toString();
-        options.addArguments("--user-data-dir=" + userDataDir);
         
         driver = new ChromeDriver(options);
         wait = new WebDriverWait(driver, Duration.ofSeconds(10));
