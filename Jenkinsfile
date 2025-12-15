@@ -41,29 +41,52 @@ pipeline {
                 echo 'Starting application in background...'
                 // Start Uvicorn in background using nohup
                 // Env vars are automatically available from the environment block
-                sh '''
-                    cd order_manager
+                script {
+                    echo 'Stopping any existing application...'
+                    // Try to kill process on port 8000 or using pid file
+                    sh '''
+                        if [ -f order_manager/app.pid ]; then
+                            kill $(cat order_manager/app.pid) || true
+                            rm order_manager/app.pid
+                        else
+                            # Fallback: kill anything on port 8000 (requires lsof or netstat or fuser)
+                            # We will assume checking app.pid is sufficient for this pipeline flow
+                            echo "No pid file found."
+                        fi
+                    '''
                     
-                    # Use uvicorn from the virtual environment
-                    nohup venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
-                    echo $! > app.pid
-                    sleep 10  # Wait for app to startup
-                    
-                    # Verify app started by checking log for errors
-                    cat app.log
-                    if grep -q "Application startup complete" app.log; then
-                        echo "App started successfully"
-                    else
-                        echo "Warning: App might not have started correctly. Checking logs..."
-                    fi
-                '''
+                    echo 'Starting application...'
+                    // Use JENKINS_NODE_COOKIE to prevent Jenkins from killing the process after build
+                    withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+                        sh '''
+                            cd order_manager
+                            # Start in background
+                            nohup venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
+                            echo $! > app.pid
+                        '''
+                    }
+                }
             }
         }
         
         stage('Run Selenium Tests') {
             steps {
-                echo 'Running Selenium tests using Docker...'
                 script {
+                    echo 'Running Selenium tests...'
+                    // Wait for application to be ready
+                    sleep 10
+                    
+                    // Verify app started by checking log for errors
+                    sh '''
+                        cd order_manager
+                        cat app.log
+                        if grep -q "Application startup complete" app.log; then
+                            echo "App started successfully"
+                        else
+                            echo "Warning: App might not have started correctly. Checking logs..."
+                        fi
+                    '''
+                    
                     // Use pre-built image as requested
                     // Use --network="host" allows container to access localhost:8000 on the host
                     // Jenkins automatically mounts the workspace, so we just need to cd into the correct dir
@@ -86,20 +109,13 @@ pipeline {
     
     post {
         always {
-            echo 'Publishing results and cleaning up...'
+            echo 'Publishing results (Application left running)...'
             
             // Publish TestNG/JUnit results ALWAYS
             junit allowEmptyResults: true, testResults: 'selenium-tests/target/surefire-reports/*.xml'
             
-            // Stop the application
-            sh '''
-                if [ -f order_manager/app.pid ]; then
-                    kill $(cat order_manager/app.pid) || true
-                    rm order_manager/app.pid
-                fi
-            '''
-            
-            cleanWs()
+            // NOTE: We do NOT clean workspace or stop app so it remains deployable
+            // cleanWs() 
         }
         
         success {
