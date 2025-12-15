@@ -7,9 +7,11 @@ pipeline {
     }
     
     environment {
-        // Load test MongoDB URI from Jenkins credentials
-        // Assuming 'test-mongo-uri' credential exists in Jenkins
+        // Load credentials
+        // You MUST configure these in Jenkins > Manage Credentials
+        MONGO_URI = credentials('mongo-uri')
         TEST_MONGO_URI = credentials('test-mongo-uri') 
+        GROQ_API_KEY = credentials('groq-api-key')
         APP_URL = 'http://localhost:8000'
     }
     
@@ -25,6 +27,7 @@ pipeline {
             steps {
                 echo 'Setting up Order Manager Application...'
                 // Install Python dependencies
+                // Warning: This assumes pip is available on the agent
                 sh '''
                     cd order_manager
                     pip install -r requirements.txt
@@ -36,12 +39,23 @@ pipeline {
             steps {
                 echo 'Starting application in background...'
                 // Start Uvicorn in background using nohup
-                // We use 0.0.0.0 so Docker container can access it via host network or gateway
+                // We export the secrets as env vars for this shell session
                 sh '''
                     cd order_manager
+                    export MONGO_URI="${MONGO_URI}"
+                    export GROQ_API_KEY="${GROQ_API_KEY}"
+                    
                     nohup uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
                     echo $! > app.pid
                     sleep 10  # Wait for app to startup
+                    
+                    # Verify app started by checking log for errors
+                    cat app.log
+                    if grep -q "Application startup complete" app.log; then
+                        echo "App started successfully"
+                    else
+                        echo "Warning: App might not have started correctly. Checking logs..."
+                    fi
                 '''
             }
         }
