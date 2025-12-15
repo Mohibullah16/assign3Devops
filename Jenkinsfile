@@ -67,7 +67,8 @@ pipeline {
                     // Use pre-built image as requested
                     // Use --network="host" allows container to access localhost:8000 on the host
                     // Jenkins automatically mounts the workspace, so we just need to cd into the correct dir
-                    docker.image('markhobson/maven-chrome:jdk-17').inside('--network="host"') {
+                    // We MUST set HOME to the workspace because the default home (/) is not writable for the jenkins user, causing Chrome to fail
+                    docker.image('markhobson/maven-chrome:jdk-17').inside("--network='host' -e HOME=${env.WORKSPACE}") {
                         sh 'cd selenium-tests && mvn test'
                     }
                 }
