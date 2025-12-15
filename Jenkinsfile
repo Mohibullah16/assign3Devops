@@ -65,13 +65,10 @@ pipeline {
                 echo 'Running Selenium tests using Docker...'
                 script {
                     // Use pre-built image as requested
-                    // Mount the selenium-tests directory into the container
                     // Use --network="host" allows container to access localhost:8000 on the host
-                    docker.image('markhobson/maven-chrome:jdk-17').inside('--network="host" -v $WORKSPACE/selenium-tests:/usr/src/app -w /usr/src/app') {
-                        // Environment variables inside container
-                        withEnv(["APP_URL=${APP_URL}", "TEST_MONGO_URI=${TEST_MONGO_URI}"]) {
-                            sh 'mvn test'
-                        }
+                    // Jenkins automatically mounts the workspace, so we just need to cd into the correct dir
+                    docker.image('markhobson/maven-chrome:jdk-17').inside('--network="host"') {
+                        sh 'cd selenium-tests && mvn test'
                     }
                 }
             }
