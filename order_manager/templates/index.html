@@ -385,32 +385,18 @@
 
         // Camera Functions
         async function openCamera() {
-            // Check if browser supports camera access
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Camera access is not supported in this browser. Please use a modern browser (Chrome, Firefox, Safari, or Edge) and ensure the page is served over HTTPS.');
-                return;
-            }
-            
             const modal = document.getElementById('cameraModal');
             const video = document.getElementById('cameraVideo');
             const canvas = document.getElementById('capturedCanvas');
             
             try {
-                // Request camera access with fallback options
-                const constraints = {
-                    video: {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
                         facingMode: 'environment', // Use back camera on mobile devices
                         width: { ideal: 1920 },
                         height: { ideal: 1080 }
-                    }
-                };
-                
-                cameraStream = await navigator.mediaDevices.getUserMedia(constraints).catch(async (err) => {
-                    // Fallback to simpler constraints if the first attempt fails
-                    console.warn('Advanced camera constraints failed, trying basic video:', err);
-                    return await navigator.mediaDevices.getUserMedia({ video: true });
+                    } 
                 });
-                
                 video.srcObject = cameraStream;
                 video.style.display = 'block';
                 canvas.style.display = 'none';
@@ -421,20 +407,7 @@
                 
                 modal.classList.add('active');
             } catch (error) {
-                let errorMsg = 'Unable to access camera: ';
-                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-                    errorMsg += 'Camera permission denied. Please allow camera access in your browser settings.';
-                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-                    errorMsg += 'No camera found on this device.';
-                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-                    errorMsg += 'Camera is already in use by another application.';
-                } else if (error.name === 'NotSupportedError') {
-                    errorMsg += 'This browser does not support camera access. Please use HTTPS.';
-                } else {
-                    errorMsg += error.message || 'Unknown error occurred.';
-                }
-                alert(errorMsg);
-                console.error('Camera error:', error);
+                alert('Unable to access camera: ' + error.message);
             }
         }
 
