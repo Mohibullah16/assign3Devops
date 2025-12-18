@@ -369,3 +369,4 @@ This project is created for educational purposes as part of DevOps Assignment 3.
 - [ ] Google form submitted with URLs
 # Test webhook
 # Test webhook
+# Test email
