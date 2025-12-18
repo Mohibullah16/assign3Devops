@@ -5,8 +5,8 @@
 ### 1. Setup Environment
 
 ```bash
-# Install Python 3.11 and create virtual environment
-python3.11 -m venv venv
+# Install Python 3.12 and create virtual environment
+python3.12 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
@@ -73,13 +73,14 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 # Install everything
 sudo apt update
-sudo apt install -y python3.11 python3.11-venv python3-pip docker.io openjdk-11-jdk
+sudo apt install -y python3.12 python3.12-venv python3-pip docker.io openjdk-11-jdk
 
 # Clone and setup app
 git clone <your-repo> Assignment3
 cd Assignment3/order_manager
-python3.11 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
+cd ./order_manager/
 pip install -r requirements.txt
 
 # Create .env and start
