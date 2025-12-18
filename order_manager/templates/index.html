@@ -144,6 +144,46 @@
             margin-top: 1rem;
             font-style: italic;
         }
+        #cameraModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        #cameraModal.active {
+            display: flex;
+        }
+        .camera-container {
+            max-width: 90%;
+            max-height: 90%;
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        #cameraVideo {
+            max-width: 100%;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        #capturedCanvas {
+            display: none;
+            max-width: 100%;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        .camera-controls {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
@@ -186,10 +226,11 @@
             <div id="addOrderForm">
                 <!-- OCR Upload Section -->
                 <div id="ocrUploadSection">
-                    <h4>📸 Upload Invoice for OCR</h4>
-                    <div>
-                        <input type="file" id="invoiceImage" name="invoice" accept="image/*" required>
+                    <h4>📸 Upload or Capture Invoice for OCR</h4>
+                    <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                        <input type="file" id="invoiceImage" name="invoice" accept="image/*" style="flex: 1; min-width: 200px;">
                         <button type="button" id="ocrSubmitBtn" onclick="submitOCR()">Scan Invoice</button>
+                        <button type="button" class="secondary" onclick="openCamera()">📷 Use Camera</button>
                     </div>
                     <div id="ocrStatus"></div>
                 </div>
@@ -268,8 +309,25 @@
         {% endif %}
     </main>
 
+    <!-- Camera Modal -->
+    <div id="cameraModal">
+        <div class="camera-container">
+            <h4>📷 Capture Invoice</h4>
+            <video id="cameraVideo" autoplay playsinline></video>
+            <canvas id="capturedCanvas"></canvas>
+            <div class="camera-controls">
+                <button type="button" id="captureBtn" onclick="capturePhoto()">📸 Capture</button>
+                <button type="button" id="useCapturedBtn" onclick="useCapturedImage()" style="display: none;">✅ Use This Photo</button>
+                <button type="button" id="retakeBtn" onclick="retakePhoto()" style="display: none;" class="secondary">🔄 Retake</button>
+                <button type="button" onclick="closeCamera()" class="contrast">✕ Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let itemCounter = 0;
+        let cameraStream = null;
+        let capturedImageBlob = null;
 
         function addLineItem(data = {}) {
             itemCounter++;
@@ -325,6 +383,128 @@
             }
         }
 
+        // Camera Functions
+        async function openCamera() {
+            const modal = document.getElementById('cameraModal');
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.getElementById('capturedCanvas');
+            
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment', // Use back camera on mobile devices
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    } 
+                });
+                video.srcObject = cameraStream;
+                video.style.display = 'block';
+                canvas.style.display = 'none';
+                
+                document.getElementById('captureBtn').style.display = 'inline-block';
+                document.getElementById('useCapturedBtn').style.display = 'none';
+                document.getElementById('retakeBtn').style.display = 'none';
+                
+                modal.classList.add('active');
+            } catch (error) {
+                alert('Unable to access camera: ' + error.message);
+            }
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.getElementById('capturedCanvas');
+            const context = canvas.getContext('2d');
+            
+            // Set canvas size to video size
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Draw video frame to canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convert canvas to blob
+            canvas.toBlob((blob) => {
+                capturedImageBlob = blob;
+            }, 'image/jpeg', 0.95);
+            
+            // Hide video, show canvas
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            
+            // Update buttons
+            document.getElementById('captureBtn').style.display = 'none';
+            document.getElementById('useCapturedBtn').style.display = 'inline-block';
+            document.getElementById('retakeBtn').style.display = 'inline-block';
+        }
+
+        function retakePhoto() {
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.getElementById('capturedCanvas');
+            
+            video.style.display = 'block';
+            canvas.style.display = 'none';
+            
+            document.getElementById('captureBtn').style.display = 'inline-block';
+            document.getElementById('useCapturedBtn').style.display = 'none';
+            document.getElementById('retakeBtn').style.display = 'none';
+            
+            capturedImageBlob = null;
+        }
+
+        function closeCamera() {
+            const modal = document.getElementById('cameraModal');
+            const video = document.getElementById('cameraVideo');
+            
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            
+            video.srcObject = null;
+            modal.classList.remove('active');
+            capturedImageBlob = null;
+        }
+
+        async function useCapturedImage() {
+            if (!capturedImageBlob) {
+                alert('No image captured');
+                return;
+            }
+            
+            closeCamera();
+            
+            // Process the captured image through OCR
+            const formData = new FormData();
+            formData.append('file', capturedImageBlob, 'camera-capture.jpg');
+            
+            const statusDiv = document.getElementById('ocrStatus');
+            const submitBtn = document.getElementById('ocrSubmitBtn');
+            
+            statusDiv.innerHTML = '⏳ Processing captured image...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/process_ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = '✅ Invoice scanned successfully! Filling form...';
+                    fillFormWithOCRData(result.data);
+                } else {
+                    statusDiv.innerHTML = `❌ Error: ${result.error || 'Failed to process invoice'}`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
         // OCR Upload Handler
         async function submitOCR() {
             const fileInput = document.getElementById('invoiceImage');
@@ -353,31 +533,8 @@
                 
                 if (result.success) {
                     statusDiv.innerHTML = '✅ Invoice scanned successfully! Filling form...';
-                    
-                    // Parse the nested JSON data
-                    const data = typeof result.data === 'string' ? JSON.parse(result.data) : result.data;
-                    
-                    // Fill form fields from header
-                    if (data.header) {
-                        document.getElementById('invoice_number').value = data.header.invoice_number || '';
-                        document.getElementById('customer_name').value = data.header.customer || '';
-                        document.getElementById('salesman_name').value = data.header.salesman || '';
-                    }
-                    
-                    // Clear and add items
-                    document.getElementById('lineItemsContainer').innerHTML = '';
-                    itemCounter = 0;
-                    
-                    if (data.items && data.items.length > 0) {
-                        data.items.forEach(item => addLineItem(item));
-                    } else {
-                        addLineItem();
-                    }
-                    
-                    setTimeout(() => {
-                        statusDiv.innerHTML = '';
-                        fileInput.value = '';
-                    }, 3000);
+                    fillFormWithOCRData(result.data);
+                    fileInput.value = '';
                 } else {
                     statusDiv.innerHTML = `❌ Error: ${result.error || 'Failed to process invoice'}`;
                 }
@@ -386,6 +543,33 @@
             } finally {
                 submitBtn.disabled = false;
             }
+        }
+
+        // Helper function to fill form with OCR data
+        function fillFormWithOCRData(data) {
+            // Parse the nested JSON data
+            const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+            
+            // Fill form fields from header
+            if (parsedData.header) {
+                document.getElementById('invoice_number').value = parsedData.header.invoice_number || '';
+                document.getElementById('customer_name').value = parsedData.header.customer || '';
+                document.getElementById('salesman_name').value = parsedData.header.salesman || '';
+            }
+            
+            // Clear and add items
+            document.getElementById('lineItemsContainer').innerHTML = '';
+            itemCounter = 0;
+            
+            if (parsedData.items && parsedData.items.length > 0) {
+                parsedData.items.forEach(item => addLineItem(item));
+            } else {
+                addLineItem();
+            }
+            
+            setTimeout(() => {
+                document.getElementById('ocrStatus').innerHTML = '';
+            }, 3000);
         }
 
         // Add one item by default when page loads
