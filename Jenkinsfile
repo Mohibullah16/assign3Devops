@@ -121,7 +121,7 @@ pipeline {
         success {
             echo 'Pipeline successfully executed!'
             emailext (
-                to: 'mohibazhar16@gmail.com',
+                to: 'mohibazhar16@gmail.com, qasim.malik@comsats.edu.pk',
                 subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: """<p>Build Status: SUCCESS</p>
                          <p>The build finished successfully.</p>
@@ -134,7 +134,7 @@ pipeline {
         failure {
             echo 'Pipeline failed!'
             emailext (
-                to: 'mohibazhar16@gmail.com',
+                to: 'mohibazhar16@gmail.com, qasim.malik@comsats.edu.pk',
                 subject: "FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: """<p>Build Status: FAILURE</p>
                          <p>The build failed. Please check the logs.</p>
@@ -147,7 +147,7 @@ pipeline {
         unstable {
             echo 'Pipeline is unstable!'
             emailext (
-                to: 'mohibazhar16@gmail.com',
+                to: 'mohibazhar16@gmail.com, qasim.malik@comsats.edu.pk',
                 subject: "UNSTABLE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: """<p>Build Status: UNSTABLE</p>
                          <p>Some tests may have failed.</p>
